@@ -1,20 +1,14 @@
-# Dependências - não sobe para o GitHub
 node_modules/
 
-# Variáveis de ambiente sensíveis
 .env
 
-# Arquivos do sistema operacional
 .DS_Store
 Thumbs.db
 
-# Logs
 *.log
 npm-debug.log*
 
-# Pasta de build
 dist/
 build/
 
-# Volumes do Docker (gerados automaticamente)
 pg_data/

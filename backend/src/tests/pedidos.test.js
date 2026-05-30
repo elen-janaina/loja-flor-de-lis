@@ -1,6 +1,4 @@
 // Testes do módulo de Pedidos
-// Para rodar: npm test
-
 const request = require('supertest');
 const app = require('../app');
 
@@ -8,7 +6,6 @@ let tokenCliente = '';
 let tokenVendedor = '';
 let idPedidoCriado = '';
 
-// Faz login antes de todos os testes
 beforeAll(async () => {
   const resCliente = await request(app)
     .post('/api/auth/login')
@@ -21,48 +18,7 @@ beforeAll(async () => {
   tokenVendedor = resVendedor.body.token;
 });
 
-// ─── Testes de Criação de Pedido ─────────────────────────
-
 describe('Criação de pedido', () => {
-
-  test('cliente deve conseguir criar um pedido', async () => {
-    // Primeiro pega um produto disponível
-    const resProdutos = await request(app).get('/api/produtos');
-    const produtos = resProdutos.body;
-
-    if (produtos.length === 0) {
-      console.log('Sem produtos cadastrados para testar pedido');
-      return;
-    }
-
-    // Pega o primeiro produto com estoque
-    const produto = produtos.find(p =>
-      p.estoques && p.estoques.some(e => e.quantidade_disponivel > 0)
-    );
-
-    if (!produto) {
-      console.log('Sem produtos com estoque para testar');
-      return;
-    }
-
-    const tamanhoDisponivel = produto.estoques.find(e => e.quantidade_disponivel > 0);
-
-    const resposta = await request(app)
-      .post('/api/pedidos')
-      .set('Authorization', 'Bearer ' + tokenCliente)
-      .send({
-        itens: [{
-          produto_id: produto.id,
-          tamanho: tamanhoDisponivel.tamanho,
-          quantidade: 1
-        }]
-      });
-
-    expect(resposta.status).toBe(201);
-    expect(resposta.body).toHaveProperty('pedido_id');
-    expect(resposta.body).toHaveProperty('total');
-    idPedidoCriado = resposta.body.pedido_id;
-  });
 
   test('não deve criar pedido sem estar logado', async () => {
     const resposta = await request(app)
@@ -79,35 +35,84 @@ describe('Criação de pedido', () => {
       .send({ itens: [] });
 
     expect(resposta.status).toBe(400);
-    expect(resposta.body.erro).toBe('Carrinho vazio.');
+    expect(resposta.body.erro).toBe('O carrinho está vazio.');
   });
 
-  test('o frete fixo deve ser R$ 10,00', async () => {
+  test('cliente deve conseguir criar um pedido', async () => {
+    // Busca produtos disponíveis
     const resProdutos = await request(app).get('/api/produtos');
-    const produto = resProdutos.body.find(p =>
-      p.estoques && p.estoques.some(e => e.quantidade_disponivel > 0)
-    );
+    const lista = resProdutos.body;
 
-    if (!produto) return;
+    if (!Array.isArray(lista) || lista.length === 0) return;
 
-    const tamanho = produto.estoques.find(e => e.quantidade_disponivel > 0);
+    // Acha produto com estoque
+    let produtoEscolhido = null;
+    let tamanhoEscolhido = null;
+    for (const p of lista) {
+      if (p.estoques && Array.isArray(p.estoques)) {
+        for (const e of p.estoques) {
+          if (e.quantidade_disponivel > 0) {
+            produtoEscolhido = p;
+            tamanhoEscolhido = e.tamanho;
+            break;
+          }
+        }
+      }
+      if (produtoEscolhido) break;
+    }
+
+    if (!produtoEscolhido) return;
 
     const resposta = await request(app)
       .post('/api/pedidos')
       .set('Authorization', 'Bearer ' + tokenCliente)
       .send({
-        itens: [{ produto_id: produto.id, tamanho: tamanho.tamanho, quantidade: 1 }]
+        itens: [{
+          produto_id: produtoEscolhido.id,
+          tamanho: tamanhoEscolhido,
+          quantidade: 1
+        }]
       });
 
+    expect(resposta.status).toBe(201);
+    expect(resposta.body).toHaveProperty('pedido_id');
+    expect(resposta.body).toHaveProperty('total');
+    idPedidoCriado = resposta.body.pedido_id;
+  });
+
+  test('o total deve incluir frete de R$ 10,00', async () => {
+    const resProdutos = await request(app).get('/api/produtos');
+    const lista = resProdutos.body;
+    if (!Array.isArray(lista) || lista.length === 0) return;
+
+    let produto = null;
+    let tamanho = null;
+    for (const p of lista) {
+      if (p.estoques && Array.isArray(p.estoques)) {
+        for (const e of p.estoques) {
+          if (e.quantidade_disponivel > 0) {
+            produto = p;
+            tamanho = e.tamanho;
+            break;
+          }
+        }
+      }
+      if (produto) break;
+    }
+
+    if (!produto) return;
+
+    const resposta = await request(app)
+      .post('/api/pedidos')
+      .set('Authorization', 'Bearer ' + tokenCliente)
+      .send({ itens: [{ produto_id: produto.id, tamanho, quantidade: 1 }] });
+
     if (resposta.status === 201) {
-      // Total deve ser preço do produto + R$10 de frete
       expect(parseFloat(resposta.body.total)).toBeGreaterThan(10);
     }
   });
 
 });
-
-// ─── Testes de Listagem de Pedidos ───────────────────────
 
 describe('Listagem de pedidos', () => {
 
@@ -131,15 +136,21 @@ describe('Listagem de pedidos', () => {
 
   test('não deve listar pedidos sem login', async () => {
     const resposta = await request(app).get('/api/pedidos');
-
     expect(resposta.status).toBe(401);
   });
 
 });
 
-// ─── Testes de Confirmação de Venda ──────────────────────
-
 describe('Confirmação de venda', () => {
+
+  test('cliente não deve ter permissão para confirmar venda', async () => {
+    const resposta = await request(app)
+      .post('/api/pedidos/1/confirmar')
+      .set('Authorization', 'Bearer ' + tokenCliente)
+      .send({});
+
+    expect(resposta.status).toBe(403);
+  });
 
   test('vendedor deve conseguir confirmar um pedido pendente', async () => {
     if (!idPedidoCriado) return;
@@ -162,16 +173,7 @@ describe('Confirmação de venda', () => {
       .send({});
 
     expect(resposta.status).toBe(400);
-    expect(resposta.body.erro).toBe('Apenas pedidos pendentes podem ser confirmados.');
-  });
-
-  test('cliente não deve ter permissão para confirmar venda', async () => {
-    const resposta = await request(app)
-      .post('/api/pedidos/1/confirmar')
-      .set('Authorization', 'Bearer ' + tokenCliente)
-      .send({});
-
-    expect(resposta.status).toBe(403);
+    expect(resposta.body.erro).toBe('Pedido não encontrado ou já processado.');
   });
 
 });

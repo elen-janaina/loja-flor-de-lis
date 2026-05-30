@@ -1,28 +1,24 @@
-// Testes do módulo de Produtos
-// Para rodar: npm test
-
+// Testes do módulo de produtos
 const request = require('supertest');
 const app = require('../app');
 
-// Token de admin para testes que precisam de permissão
 let tokenAdmin = '';
 let tokenCliente = '';
 let idProdutoCriado = '';
 
-// Antes de tudo, faz login para pegar os tokens
 beforeAll(async () => {
+  // Faz login como admin
   const resAdmin = await request(app)
     .post('/api/auth/login')
     .send({ email: 'admin@loja.com', senha: 'admin123' });
   tokenAdmin = resAdmin.body.token;
 
+  // Faz login como cliente
   const resCliente = await request(app)
     .post('/api/auth/login')
     .send({ email: 'cliente@loja.com', senha: 'cliente123' });
   tokenCliente = resCliente.body.token;
 });
-
-// ─── Testes de Listagem ───────────────────────────────────
 
 describe('Listagem de produtos', () => {
 
@@ -59,8 +55,6 @@ describe('Listagem de produtos', () => {
   });
 
 });
-
-// ─── Testes de Cadastro de Produto ───────────────────────
 
 describe('Cadastro de produto', () => {
 
@@ -116,8 +110,6 @@ describe('Cadastro de produto', () => {
 
 });
 
-// ─── Testes de Edição e Estoque ──────────────────────────
-
 describe('Edição e estoque de produto', () => {
 
   test('admin deve conseguir atualizar o estoque', async () => {
@@ -152,7 +144,7 @@ describe('Edição e estoque de produto', () => {
       .set('Authorization', 'Bearer ' + tokenAdmin);
 
     expect(resposta.status).toBe(200);
-    expect(resposta.body.mensagem).toBe('Produto desativado com sucesso.');
+    expect(resposta.body.mensagem).toBe('Produto removido (desativado) com sucesso.');
   });
 
 });

@@ -1,4 +1,3 @@
-// server.js - Inicializa o banco e sobe o servidor
 require('dotenv').config();
 const bcrypt = require('bcryptjs');
 const app = require('./app');

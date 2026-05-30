@@ -1,7 +1,6 @@
-// Configuração da URL da nossa API (Backend)
+// Configuração da URL da API (Backend)
 const API_URL = 'http://localhost:3001/api';
 
-// Estado global da aplicação (onde guardamos os dados enquanto usamos o site)
 const estado = {
   usuario: JSON.parse(localStorage.getItem('user') || 'null'),
   token: localStorage.getItem('token') || null,
@@ -11,11 +10,11 @@ const estado = {
   paginaAtual: 'catalogo'
 };
 
-// Função auxiliar para fazer chamadas para o servidor (API)
+//Função auxiliar para fazer chamadas para o servidor (API)
 async function chamarApi(metodo, caminho, corpo) {
   const cabecalhos = { 'Content-Type': 'application/json' };
   
-  // Se o usuário estiver logado, enviamos o token de segurança
+  // Se o usuário estiver logado, envia o token de segurança
   if (estado.token) {
     cabecalhos['Authorization'] = `Bearer ${estado.token}`;
   }

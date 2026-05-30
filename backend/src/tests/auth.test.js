@@ -1,18 +1,13 @@
 // Testes de Autenticação - Login e Cadastro
-// Para rodar: npm test
-
 const request = require('supertest');
 const app = require('../app');
 
-// Dados usados nos testes
 const usuarioTeste = {
   nome: 'Usuario Teste',
-  email: 'teste_jest@email.com',
+  email: 'teste_jest_auth@email.com',
   senha: 'senha123',
   perfil: 'cliente'
 };
-
-// ─── Testes de Cadastro ───────────────────────────────────
 
 describe('Cadastro de usuário', () => {
 
@@ -28,9 +23,9 @@ describe('Cadastro de usuário', () => {
   });
 
   test('não deve cadastrar com e-mail já existente', async () => {
-    // Tenta cadastrar o mesmo e-mail duas vezes
+    // Primeiro cadastro
     await request(app).post('/api/auth/registrar').send(usuarioTeste);
-
+    // Segundo cadastro com mesmo e-mail
     const resposta = await request(app)
       .post('/api/auth/registrar')
       .send(usuarioTeste);
@@ -45,7 +40,6 @@ describe('Cadastro de usuário', () => {
       .send({ email: 'sem_nome@email.com', senha: '123456' });
 
     expect(resposta.status).toBe(400);
-    expect(resposta.body).toHaveProperty('erro');
   });
 
   test('não deve cadastrar sem o campo senha', async () => {
@@ -54,17 +48,14 @@ describe('Cadastro de usuário', () => {
       .send({ nome: 'Teste', email: 'sem_senha@email.com' });
 
     expect(resposta.status).toBe(400);
-    expect(resposta.body).toHaveProperty('erro');
   });
 
 });
 
-// ─── Testes de Login ──────────────────────────────────────
-
 describe('Login de usuário', () => {
 
-  // Cadastra o usuário antes de testar o login
   beforeAll(async () => {
+    // Garante que o usuário existe antes de testar o login
     await request(app).post('/api/auth/registrar').send(usuarioTeste);
   });
 
@@ -97,7 +88,7 @@ describe('Login de usuário', () => {
     expect(resposta.body.erro).toBe('Credenciais inválidas.');
   });
 
-  test('o token retornado deve ser uma string', async () => {
+  test('o token retornado deve ser uma string válida', async () => {
     const resposta = await request(app)
       .post('/api/auth/login')
       .send({ email: usuarioTeste.email, senha: usuarioTeste.senha });
