@@ -30,40 +30,6 @@ admin@loja.com    | admin123    | Administrador
 cliente@loja.com  | cliente123  | Cliente 
 vendedor@loja.com | vendedor123 | Vendedor 
 
-## 📁 Estrutura do Projeto
-
-loja-roupas/
-├── docker-compose.yml          # Orquestração dos serviços
-├── nginx/
-│   └── nginx.conf              # Configuração do servidor web
-├── frontend/
-│   ├── index.html              # SPA principal (todas as telas)
-│   ├── css/style.css           # Estilos 
-│   └── js/app.js               # Lógica da aplicação
-└── backend/
-    ├── Dockerfile
-    ├── package.json
-    └── src/
-        ├── server.js           
-        ├── config/database.js  # Conexão com PostgreSQL
-        ├── models/             
-        │   ├── Usuario.js
-        │   ├── Produto.js
-        │   ├── Estoque.js
-        │   ├── Pedido.js
-        │   └── index.js        # Associações
-        ├── controllers/        # Lógica de cada módulo
-        │   ├── authController.js
-        │   ├── produtoController.js
-        │   └── pedidoController.js
-        ├── routes/             # Endpoints da API
-        │   ├── auth.js
-        │   ├── produtos.js
-        │   └── pedidos.js
-        └── middlewares/
-            └── auth.js         
-
-
 ## Testes Funcionais
 
 Para testar a API manualmente:
