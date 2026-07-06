@@ -69,6 +69,7 @@ function navegarPara(pagina) {
   if (pagina === 'carrinho') renderizarCarrinho();
   if (pagina === 'admin') renderizarAdmin();
   if (pagina === 'vendedor') renderizarVendedor();
+  if (pagina === 'meus-pedidos') renderizarMeusPedidos();
 }
 
 // Atualiza o menu superior conforme o login do usuário
@@ -77,6 +78,7 @@ function atualizarMenu() {
   const navUser = document.getElementById('navUser');
   const navAdmin = document.getElementById('navAdmin');
   const navVendedor = document.getElementById('navVendedor');
+  const navMeusPedidos = document.getElementById('navMeusPedidos');
 
   if (estado.usuario) {
     // Se logado, mostra botão de sair e nome do usuário
@@ -86,12 +88,14 @@ function atualizarMenu() {
     // Mostra menus administrativos se tiver permissão
     navAdmin.style.display = estado.usuario.perfil === 'administrador' ? 'inline' : 'none';
     navVendedor.style.display = estado.usuario.perfil === 'vendedor' ? 'inline' : 'none';
+    navMeusPedidos.style.display = estado.usuario.perfil === 'cliente' ? 'inline' : 'none';
   } else {
     // Se não logado, mostra botão de entrar
     navAuth.innerHTML = `<a href="#" class="btn nav-btn-entrar btn-sm" onclick="navegarPara('login')">Entrar</a>`;
     navUser.textContent = '';
     navAdmin.style.display = 'none';
     navVendedor.style.display = 'none';
+    navMeusPedidos.style.display = 'none';
   }
   atualizarIconeCarrinho();
 }
@@ -517,6 +521,58 @@ async function apagarProduto(id) {
   }
 }
 
+// --- Meus Pedidos (Cliente) ---
+
+async function renderizarMeusPedidos() {
+  if (!estado.usuario || estado.usuario.perfil !== 'cliente') {
+    navegarPara('login');
+    return;
+  }
+
+  try {
+    // O backend já filtra automaticamente para trazer só os pedidos deste cliente
+    const pedidos = await chamarApi('GET', '/pedidos');
+    const container = document.getElementById('meusPedidosLista');
+
+    if (!pedidos.length) {
+      container.innerHTML = `<p>Você ainda não fez nenhum pedido.</p>`;
+      return;
+    }
+
+    container.innerHTML = `
+      <table class="data-table">
+        <thead>
+          <tr><th>ID</th><th>Data</th><th>Total</th><th>Status</th><th>Ações</th></tr>
+        </thead>
+        <tbody>
+          ${pedidos.map(p => `
+            <tr>
+              <td>#${p.id}</td>
+              <td>${new Date(p.createdAt).toLocaleDateString('pt-BR')}</td>
+              <td>R$ ${parseFloat(p.total).toFixed(2).replace('.', ',')}</td>
+              <td><span class="status-badge status-${p.status}">${formatarStatus(p.status)}</span></td>
+              <td><button class="btn btn-sm btn-secondary" onclick="visualizarPedido(${p.id})">Ver detalhes</button></td>
+            </tr>
+          `).join('')}
+        </tbody>
+      </table>
+    `;
+  } catch (erro) {
+    mostrarMensagem('Erro ao carregar seus pedidos.', 'error');
+  }
+}
+
+// Deixa o texto do status mais amigável para o cliente
+function formatarStatus(status) {
+  const nomes = {
+    pendente: 'Pendente',
+    em_preparacao: 'Em preparação',
+    enviado: 'Enviado',
+    cancelado: 'Cancelado'
+  };
+  return nomes[status] || status;
+}
+
 // --- Painel do Vendedor ---
 
 async function renderizarVendedor() {
@@ -547,6 +603,14 @@ async function renderizarVendedor() {
               <td>
                 <button class="btn btn-sm btn-secondary" onclick="visualizarPedido(${p.id})">Ver</button>
                 ${p.status === 'pendente' ? `<button class="btn btn-sm btn-success" onclick="confirmarPedidoVenda(${p.id})">Confirmar</button>` : ''}
+                ${p.status !== 'pendente' ? `
+                  <select class="status-select" onchange="alterarStatusPedido(${p.id}, this.value)">
+                    <option value="">Alterar status...</option>
+                    <option value="em_preparacao" ${p.status === 'em_preparacao' ? 'selected' : ''}>Em preparação</option>
+                    <option value="enviado" ${p.status === 'enviado' ? 'selected' : ''}>Enviado</option>
+                    <option value="cancelado" ${p.status === 'cancelado' ? 'selected' : ''}>Cancelado</option>
+                  </select>
+                ` : ''}
               </td>
             </tr>
           `).join('')}
@@ -566,6 +630,24 @@ async function confirmarPedidoVenda(id) {
     renderizarVendedor();
   } catch (erro) { 
     mostrarMensagem(erro.message, 'error'); 
+  }
+}
+
+// Permite ao vendedor avançar o pedido para "enviado" ou "cancelado"
+// depois que ele já saiu de "pendente" (usa a rota PATCH /pedidos/:id/status,
+// que já existia no backend mas não tinha nenhum botão ligado a ela no frontend)
+async function alterarStatusPedido(id, novoStatus) {
+  if (!novoStatus) return;
+  if (!confirm(`Deseja alterar o status deste pedido para "${novoStatus}"?`)) {
+    renderizarVendedor();
+    return;
+  }
+  try {
+    await chamarApi('PATCH', `/pedidos/${id}/status`, { status: novoStatus });
+    mostrarMensagem('Status atualizado!', 'success');
+    renderizarVendedor();
+  } catch (erro) {
+    mostrarMensagem(erro.message, 'error');
   }
 }
 

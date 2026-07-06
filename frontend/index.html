@@ -17,6 +17,7 @@
     <a href="#" data-page="catalogo" onclick="navegarPara('catalogo')">Início</a>
     <a href="#" data-page="admin" id="navAdmin" style="display:none" onclick="navegarPara('admin')">Admin</a>
     <a href="#" data-page="vendedor" id="navVendedor" style="display:none" onclick="navegarPara('vendedor')">Vendedor</a>
+    <a href="#" data-page="meus-pedidos" id="navMeusPedidos" style="display:none" onclick="navegarPara('meus-pedidos')">Meus Pedidos</a>
     <span class="nav-user" id="navUser"></span>
     <span id="navAuth"></span>
     <a href="#" class="nav-cart" onclick="navegarPara('carrinho')">
@@ -153,6 +154,14 @@
       <button class="tab-btn active" onclick="renderizarAdmin()">Gerenciar Produtos</button>
     </div>
     <div id="adminProdutos"></div>
+  </div>
+</div>
+
+<!-- PÁGINA: MEUS PEDIDOS (CLIENTE) -->
+<div id="page-meus-pedidos" class="page">
+  <div class="admin-page">
+    <h1>Meus Pedidos</h1>
+    <div id="meusPedidosLista"></div>
   </div>
 </div>
 
