@@ -1,6 +1,7 @@
 // Testes de Autenticação - Login e Cadastro
 const request = require('supertest');
 const app = require('../app');
+const { Usuario } = require('../models');
 
 const usuarioTeste = {
   nome: 'Usuario Teste',
@@ -8,6 +9,13 @@ const usuarioTeste = {
   senha: 'senha123',
   perfil: 'cliente'
 };
+beforeAll(async () => {
+  await Usuario.destroy({ where: { email: usuarioTeste.email } });
+});
+
+afterAll(async () => {
+  await Usuario.destroy({ where: { email: usuarioTeste.email } });
+});
 
 describe('Cadastro de usuário', () => {
 

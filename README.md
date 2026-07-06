@@ -25,10 +25,9 @@ Backend (API) http://localhost:3001
 Banco de Dados  localhost:5432 
 
 ### 4. Contas de Teste
-E-mail            | Senha       | Perfil 
-admin@loja.com    | admin123    | Administrador 
-cliente@loja.com  | cliente123  | Cliente 
-vendedor@loja.com | vendedor123 | Vendedor 
+E-mail: admin@loja.com Senha:admin123 Perfil: Administrador
+E-mail: cliente@loja.com Senha:cliente123  Perfil: Cliente
+E-mail: vendedor@loja.com Senha:vendedor123 Perfil: Vendedor
 
 ## Testes Funcionais
 

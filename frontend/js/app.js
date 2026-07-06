@@ -1,5 +1,6 @@
 // Configuração da URL da API (Backend)
-const API_URL = 'http://localhost:3001/api';
+// No Docker usamos '/api' para o Nginx redirecionar
+const API_URL = '/api';
 
 const estado = {
   usuario: JSON.parse(localStorage.getItem('user') || 'null'),
