@@ -1,6 +1,10 @@
 // Configuração da URL da API (Backend)
 // No Docker usamos '/api' para o Nginx redirecionar
-const API_URL = '/api';
+// Em produção (GitHub Pages) aponta para o backend no Render.
+// Em localhost (rodando via Docker/nginx) usa caminho relativo.
+const API_URL = (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1')
+  ? '/api'
+  : 'https://loja-roupas-backend.onrender.com/api';
 
 const estado = {
   usuario: JSON.parse(localStorage.getItem('user') || 'null'),
