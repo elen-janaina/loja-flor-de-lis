@@ -11,6 +11,7 @@
 <!-- BARRA DE NAVEGAÇÃO SUPERIOR -->
 <nav>
   <a href="#" class="nav-logo" onclick="navegarPara('catalogo')">
+    👕 Loja de Roupas
   </a>
   <div class="nav-links">
     <a href="#" data-page="catalogo" onclick="navegarPara('catalogo')">Início</a>
@@ -134,7 +135,7 @@
         </div>
         <div class="form-group">
           <label>Senha:</label>
-          <input type="password" id="regSenha" placeholder="No mínimo 6 caracteres" minlength="6" required>
+          <input type="password" id="regSenha" placeholder="Mínimo 8 caracteres, com letras e números" minlength="8" pattern="(?=.*[A-Za-z])(?=.*\d).{8,}" title="Use no mínimo 8 caracteres, incluindo letras e números" required>
         </div>
         <button type="submit" class="btn btn-primary btn-full">Cadastrar</button>
       </form>
