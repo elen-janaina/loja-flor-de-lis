@@ -1,26 +1,26 @@
-const jwt = require('jsonwebtoken');
+const router = require('express').Router();
+const rateLimit = require('express-rate-limit');
+const { registrar, login } = require('../controllers/authController');
 
-function autenticar(req, res, next) {
-  const auth = req.headers.authorization;
-  if (!auth || !auth.startsWith('Bearer ')) {
-    return res.status(401).json({ erro: 'Token não fornecido.' });
-  }
-  try {
-    const token = auth.split(' ')[1];
-    req.usuario = jwt.verify(token, process.env.JWT_SECRET);
-    next();
-  } catch {
-    return res.status(401).json({ erro: 'Token inválido ou expirado.' });
-  }
-}
+// Limita tentativas de login: 5 por IP a cada 15 minutos
+const limiteLogin = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 5,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { erro: 'Muitas tentativas de login. Tente novamente em alguns minutos.' }
+});
 
-function autorizar(...perfis) {
-  return (req, res, next) => {
-    if (!perfis.includes(req.usuario.perfil)) {
-      return res.status(403).json({ erro: 'Acesso negado para este perfil.' });
-    }
-    next();
-  };
-}
+// Limita cadastros: 10 por IP a cada hora (evita spam de contas)
+const limiteRegistro = rateLimit({
+  windowMs: 60 * 60 * 1000,
+  max: 10,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { erro: 'Muitas tentativas de cadastro. Tente novamente mais tarde.' }
+});
 
-module.exports = { autenticar, autorizar };
+router.post('/registrar', limiteRegistro, registrar);
+router.post('/login', limiteLogin, login);
+
+module.exports = router;
