@@ -130,12 +130,18 @@ async function realizarLogin(evento) {
 // Função de Cadastro de novo cliente
 async function realizarCadastro(evento) {
   evento.preventDefault();
-  const nome = document.getElementById('regNome').value;
-  const email = document.getElementById('regEmail').value;
+  const nome = document.getElementById('regNome').value.trim();
+  const email = document.getElementById('regEmail').value.trim();
   const senha = document.getElementById('regSenha').value;
 
+  // Validação amigável antes de enviar pro servidor
+  if (senha.length < 8 || !/[a-zA-Z]/.test(senha) || !/[0-9]/.test(senha)) {
+    mostrarMensagem('A senha deve ter no mínimo 8 caracteres, incluindo letras e números.', 'error');
+    return;
+  }
+
   try {
-    await chamarApi('POST', '/auth/registrar', { nome, email, senha, perfil: 'cliente' });
+    await chamarApi('POST', '/auth/registrar', { nome, email, senha });
     mostrarMensagem('Conta criada com sucesso! Agora você pode entrar.', 'success');
     navegarPara('login');
   } catch (erro) { 
