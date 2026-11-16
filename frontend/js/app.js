@@ -5,6 +5,7 @@ const estado = {
   usuario: JSON.parse(localStorage.getItem('user') || 'null'),
   token: localStorage.getItem('token') || null,
   carrinho: JSON.parse(localStorage.getItem('cart') || '[]'),
+  cidadeEntrega: localStorage.getItem('deliveryCity') || '',
   produtos: [],
   pedidos: [],
   paginaAtual: 'catalogo'
@@ -358,10 +359,6 @@ function renderizarCarrinho() {
     return;
   }
 
-  const subtotal = estado.carrinho.reduce((soma, item) => soma + parseFloat(item.preco) * item.quantidade, 0);
-  const frete = 10;
-  const total = subtotal + frete;
-
   container.innerHTML = estado.carrinho.map((item, idx) => `
     <div class="cart-item">
       <img src="${item.imagem_url || 'https://via.placeholder.com/80'}" alt="${item.nome}">
@@ -382,20 +379,88 @@ function renderizarCarrinho() {
   resumo.innerHTML = `
     <div class="cart-summary">
       <h3>Resumo da Compra</h3>
-      <div class="summary-row"><span>Subtotal</span><span>R$ ${subtotal.toFixed(2).replace('.', ',')}</span></div>
-      <div class="summary-row"><span>Frete</span><span>R$ ${frete.toFixed(2).replace('.', ',')}</span></div>
-      <div class="summary-row total"><span>Total</span><span>R$ ${total.toFixed(2).replace('.', ',')}</span></div>
+      <div class="form-group">
+        <label for="cidadeEntrega">Cidade para entrega:</label>
+        <input type="text" id="cidadeEntrega" maxlength="100" placeholder="Ex.: Santo Antônio da Patrulha" autocomplete="address-level2" required>
+        <small class="text-muted">Em Santo Antônio da Patrulha o frete é R$ 10,00. Para todas as outras cidades, a atendente calcula pelo WhatsApp.</small>
+      </div>
+      <div class="summary-row"><span>Itens</span><span id="subtotalItens">—</span></div>
+      <div class="summary-row"><span>Frete</span><span id="valorFrete">Informe a cidade</span></div>
+      <div class="summary-row total"><span id="rotuloTotal">Total</span><span id="valorTotal">—</span></div>
       ${estado.usuario?.perfil === 'cliente' 
-        ? `<button class="btn btn-primary btn-full mt-2" onclick="finalizarPedido()">Fechar pedido pelo WhatsApp</button>`
+        ? `<button id="btnFecharPedido" class="btn btn-primary btn-full mt-2" onclick="finalizarPedido()" disabled>Fechar pedido pelo WhatsApp</button>`
         : `<button class="btn btn-secondary btn-full mt-2" onclick="navegarPara('login')">Entre para comprar</button>`}
     </div>
   `;
+
+  const campoCidade = document.getElementById('cidadeEntrega');
+  campoCidade.value = estado.cidadeEntrega;
+  campoCidade.addEventListener('input', () => {
+    estado.cidadeEntrega = campoCidade.value;
+    localStorage.setItem('deliveryCity', estado.cidadeEntrega);
+    atualizarResumoFrete();
+  });
+  atualizarResumoFrete();
+}
+
+function formatarMoedaBRL(valor) {
+  return Number(valor).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+}
+
+function calcularFreteCidade(cidade) {
+  const normalizada = String(cidade || '')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .trim()
+    .toLowerCase();
+  const cidadeBase = normalizada.split(',')[0]
+    .replace(/\s*-\s*(rs|rio grande do sul)$/i, '')
+    .trim();
+  return cidadeBase === 'santo antonio da patrulha' ? 10 : null;
+}
+
+function atualizarResumoFrete() {
+  const cidade = document.getElementById('cidadeEntrega')?.value.trim() || '';
+  const subtotal = estado.carrinho.reduce((soma, item) => soma + Number(item.preco) * Number(item.quantidade), 0);
+  const subtotalElemento = document.getElementById('subtotalItens');
+  const freteElemento = document.getElementById('valorFrete');
+  const rotuloTotal = document.getElementById('rotuloTotal');
+  const totalElemento = document.getElementById('valorTotal');
+  const botao = document.getElementById('btnFecharPedido');
+
+  if (subtotalElemento) subtotalElemento.textContent = formatarMoedaBRL(subtotal);
+  if (!cidade) {
+    if (freteElemento) freteElemento.textContent = 'Informe a cidade';
+    if (rotuloTotal) rotuloTotal.textContent = 'Total';
+    if (totalElemento) totalElemento.textContent = '—';
+    if (botao) botao.disabled = true;
+    return;
+  }
+
+  const frete = calcularFreteCidade(cidade);
+  if (frete === null) {
+    if (freteElemento) freteElemento.textContent = 'A calcular pela atendente';
+    if (rotuloTotal) rotuloTotal.textContent = 'Subtotal (sem frete)';
+    if (totalElemento) totalElemento.textContent = formatarMoedaBRL(subtotal);
+  } else {
+    if (freteElemento) freteElemento.textContent = formatarMoedaBRL(frete);
+    if (rotuloTotal) rotuloTotal.textContent = 'Total (frete incluído)';
+    if (totalElemento) totalElemento.textContent = formatarMoedaBRL(subtotal + frete);
+  }
+  if (botao) botao.disabled = false;
 }
 
 let pedidoEmAndamento = false;
 
 async function finalizarPedido() {
   if (!estado.carrinho.length || pedidoEmAndamento) return;
+  const cidade_entrega = document.getElementById('cidadeEntrega')?.value.trim() || '';
+  if (!cidade_entrega) {
+    mostrarMensagem('Informe a cidade de entrega para continuar.', 'error');
+    return;
+  }
+  estado.cidadeEntrega = cidade_entrega;
+  localStorage.setItem('deliveryCity', cidade_entrega);
 
   pedidoEmAndamento = true;
   const carrinhoDoPedido = estado.carrinho.map(item => ({ ...item }));
@@ -422,23 +487,30 @@ async function finalizarPedido() {
     }));
 
     // Registra o pedido primeiro; os preços e o total válidos vêm da API/banco.
-    const dados = await chamarApi('POST', '/pedidos', { itens });
-    const formatarMoeda = valor => Number(valor).toLocaleString('pt-BR', {
-      style: 'currency',
-      currency: 'BRL'
-    });
+    const dados = await chamarApi('POST', '/pedidos', { itens, cidade_entrega });
     const listaItens = carrinhoDoPedido.map(item =>
       `• ${item.nome} — tamanho ${item.tamanho} — quantidade: ${item.quantidade}`
     ).join('\n');
+    const resumoFrete = dados.frete_a_calcular
+      ? [
+          `Subtotal dos itens: ${formatarMoedaBRL(dados.subtotal)}`,
+          `Frete para ${cidade_entrega}: a calcular pela atendente`,
+          'Total final: será informado pela atendente após calcular o frete.'
+        ]
+      : [
+          `Frete: ${formatarMoedaBRL(dados.frete)}`,
+          `Total com frete: ${formatarMoedaBRL(dados.total)}`
+        ];
     const mensagem = [
       'Olá! Quero fechar um pedido na Flor-de-lis.',
       `Nome: ${estado.usuario?.nome || 'Cliente'}`,
       `Pedido: #${dados.pedido_id}`,
+      `Cidade para entrega: ${cidade_entrega}`,
       '',
       'Itens:',
       listaItens,
       '',
-      `Total (com frete): ${formatarMoeda(dados.total)}`,
+      ...resumoFrete,
       'Gostaria de combinar o pagamento e a entrega com a atendente por aqui. Obrigada!'
     ].join('\n');
     const urlWhatsApp = `https://wa.me/5551997324522?text=${encodeURIComponent(mensagem)}`;
@@ -598,14 +670,15 @@ async function renderizarMeusPedidos() {
     container.innerHTML = `
       <table class="data-table">
         <thead>
-          <tr><th>ID</th><th>Data</th><th>Total</th><th>Status</th><th>Ações</th></tr>
+          <tr><th>ID</th><th>Data</th><th>Cidade</th><th>Total / subtotal</th><th>Status</th><th>Ações</th></tr>
         </thead>
         <tbody>
           ${pedidos.map(p => `
             <tr>
               <td>#${p.id}</td>
               <td>${new Date(p.createdAt).toLocaleDateString('pt-BR')}</td>
-              <td>R$ ${parseFloat(p.total).toFixed(2).replace('.', ',')}</td>
+              <td>${escaparHtml(p.cidade_entrega || '—')}</td>
+              <td>${formatarMoedaBRL(p.total)}${pedidoFretePendente(p) ? '<br><small>Frete a calcular</small>' : ''}</td>
               <td><span class="status-badge status-${p.status}">${formatarStatus(p.status)}</span></td>
               <td><button class="btn btn-sm btn-secondary" onclick="visualizarPedido(${p.id})">Ver detalhes</button></td>
             </tr>
@@ -629,6 +702,20 @@ function formatarStatus(status) {
   return nomes[status] || status;
 }
 
+function pedidoFretePendente(pedido) {
+  return Boolean(pedido?.cidade_entrega) && Number(pedido.frete) === 0;
+}
+
+function escaparHtml(valor) {
+  return String(valor ?? '').replace(/[&<>"']/g, caractere => ({
+    '&': '&amp;',
+    '<': '&lt;',
+    '>': '&gt;',
+    '"': '&quot;',
+    "'": '&#39;'
+  })[caractere]);
+}
+
 // --- Painel do Vendedor ---
 
 async function renderizarVendedor() {
@@ -647,14 +734,15 @@ async function renderizarVendedor() {
       </div>
       <table class="data-table">
         <thead>
-          <tr><th>ID</th><th>Cliente</th><th>Total</th><th>Status</th><th>Ações</th></tr>
+          <tr><th>ID</th><th>Cliente</th><th>Cidade</th><th>Total / subtotal</th><th>Status</th><th>Ações</th></tr>
         </thead>
         <tbody>
           ${pedidos.map(p => `
             <tr>
               <td>#${p.id}</td>
               <td>${p.cliente?.nome || '—'}</td>
-              <td>R$ ${parseFloat(p.total).toFixed(2).replace('.', ',')}</td>
+              <td>${escaparHtml(p.cidade_entrega || '—')}</td>
+              <td>${formatarMoedaBRL(p.total)}${pedidoFretePendente(p) ? '<br><small>Frete a calcular</small>' : ''}</td>
               <td>${p.status}</td>
               <td>
                 <button class="btn btn-sm btn-secondary" onclick="visualizarPedido(${p.id})">Ver</button>
@@ -712,18 +800,24 @@ async function visualizarPedido(id) {
     const pedido = await chamarApi('GET', `/pedidos/${id}`);
     const modal = document.getElementById('modalPedido');
     modal.querySelector('h3').textContent = `Detalhes do Pedido #${pedido.id}`;
+    const fretePendente = pedidoFretePendente(pedido);
+    const valorFrete = Number(pedido.frete) || 0;
+    const subtotalPedido = Math.max(0, Number(pedido.total) - valorFrete);
     
     modal.querySelector('#pedidoInfo').innerHTML = `
       <p><strong>Cliente:</strong> ${pedido.cliente?.nome}</p>
       <p><strong>Status:</strong> ${pedido.status}</p>
       <p><strong>Data:</strong> ${new Date(pedido.createdAt).toLocaleDateString('pt-BR')}</p>
+      <p><strong>Cidade de entrega:</strong> ${escaparHtml(pedido.cidade_entrega || 'Não informada')}</p>
       <hr>
       <ul>
         ${pedido.itens?.map(i => `
           <li>${i.produto?.nome} (${i.tamanho}) - Qtd: ${i.quantidade}</li>
         `).join('')}
       </ul>
-      <p><strong>Total:</strong> R$ ${parseFloat(pedido.total).toFixed(2).replace('.', ',')}</p>
+      <p><strong>Subtotal dos itens:</strong> ${formatarMoedaBRL(subtotalPedido)}</p>
+      <p><strong>Frete:</strong> ${fretePendente ? 'A calcular pela atendente' : formatarMoedaBRL(valorFrete)}</p>
+      <p><strong>${fretePendente ? 'Total final' : 'Total'}:</strong> ${fretePendente ? 'A informar após cálculo do frete' : formatarMoedaBRL(pedido.total)}</p>
     `;
     modal.classList.add('open');
   } catch (erro) { 
