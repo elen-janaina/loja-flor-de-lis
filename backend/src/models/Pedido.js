@@ -6,6 +6,7 @@ const Pedido = sequelize.define('Pedido', {
   usuario_id: { type: DataTypes.INTEGER, allowNull: false },
   total: { type: DataTypes.DECIMAL(10, 2), allowNull: false },
   frete: { type: DataTypes.DECIMAL(10, 2), defaultValue: 10.00 },
+  cidade_entrega: { type: DataTypes.STRING(100), allowNull: true },
   status: {
     type: DataTypes.ENUM('pendente', 'em_preparacao', 'enviado', 'cancelado'),
     defaultValue: 'pendente'
