@@ -11,10 +11,8 @@ if (!process.env.JWT_SECRET || process.env.JWT_SECRET.length < 32) {
   process.exit(1);
 }
 
-// Contas de demonstração antigas (senhas públicas). Em produção ficam TRANCADAS.
+// Endereços de contas de demonstração antigas, bloqueadas na inicialização.
 const EMAILS_DEMO = ['admin@loja.com', 'cliente@loja.com', 'vendedor@loja.com'];
-// Só use SEED_DEMO_USERS=true no seu computador (docker-compose). Nunca no Render.
-const USAR_DEMO = process.env.SEED_DEMO_USERS === 'true';
 
 function senhaAdminForte(senha) {
   return typeof senha === 'string'
@@ -33,7 +31,7 @@ async function bloquearContasDemo() {
   if (qtd > 0) console.log(`Contas de demonstração bloqueadas: ${qtd}`);
 }
 
-// Cria o administrador real a partir de variáveis de ambiente (só quem acessa o Render conhece)
+// Cria o administrador somente por variáveis privadas do ambiente do servidor.
 async function garantirAdministrador() {
   const email = (process.env.ADMIN_EMAIL || '').toLowerCase().trim();
   const senha = process.env.ADMIN_PASSWORD;
@@ -53,8 +51,24 @@ async function garantirAdministrador() {
     process.exit(1);
   }
 
-  const existente = await Usuario.findOne({ where: { email } });
-  if (existente) return; // nunca sobrescreve uma conta que já existe
+  if (EMAILS_DEMO.includes(email)) {
+    console.error('ADMIN_EMAIL não pode usar um endereço de demonstração público. Administrador não criado.');
+    return;
+  }
+
+  const existente = await Usuario.unscoped().findOne({ where: { email } });
+  if (existente) {
+    if (existente.perfil !== 'administrador') {
+      console.error('ADMIN_EMAIL já pertence a uma conta que não é administradora. Use outro e-mail privado; conta não promovida.');
+      return;
+    }
+    const senhaAtualValida = await bcrypt.compare(senha, existente.senha_hash);
+    if (!senhaAtualValida) {
+      await existente.update({ senha_hash: await bcrypt.hash(senha, 12) });
+      console.log('Senha administrativa atualizada a partir da variável privada.');
+    }
+    return;
+  }
 
   await Usuario.create({
     nome: process.env.ADMIN_NAME || 'Administrador',
@@ -63,17 +77,6 @@ async function garantirAdministrador() {
     perfil: 'administrador'
   });
   console.log('Administrador criado com sucesso.');
-}
-
-// Só para testes locais (docker-compose): cria as contas de demonstração
-async function criarUsuariosDemo() {
-  if ((await Usuario.count()) > 0) return;
-  console.log('Criando contas de demonstração (apenas ambiente local)...');
-  await Usuario.bulkCreate([
-    { nome: 'Administrador', email: 'admin@loja.com', senha_hash: await bcrypt.hash('admin123', 10), perfil: 'administrador' },
-    { nome: 'Cliente Teste', email: 'cliente@loja.com', senha_hash: await bcrypt.hash('cliente123', 10), perfil: 'cliente' },
-    { nome: 'Vendedor Teste', email: 'vendedor@loja.com', senha_hash: await bcrypt.hash('vendedor123', 10), perfil: 'vendedor' }
-  ]);
 }
 
 // Produtos iniciais (só se a tabela estiver vazia)
@@ -99,10 +102,10 @@ const PORTA = process.env.PORT || 3001;
 sequelize.sync({ alter: true })
   .then(async () => {
     await criarProdutosIniciais();
-    if (USAR_DEMO) {
-      await criarUsuariosDemo();
-    } else {
-      await bloquearContasDemo();
+    // Invalida contas de teste antigas mesmo se a variável antiga de seed ainda existir.
+    await bloquearContasDemo();
+    if (process.env.SEED_DEMO_USERS === 'true') {
+      console.warn('SEED_DEMO_USERS não cria contas: o cadastro de usuários de demonstração foi removido.');
     }
     await garantirAdministrador();
     app.listen(PORTA, () => {
