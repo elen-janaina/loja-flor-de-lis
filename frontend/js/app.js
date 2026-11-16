@@ -386,32 +386,83 @@ function renderizarCarrinho() {
       <div class="summary-row"><span>Frete</span><span>R$ ${frete.toFixed(2).replace('.', ',')}</span></div>
       <div class="summary-row total"><span>Total</span><span>R$ ${total.toFixed(2).replace('.', ',')}</span></div>
       ${estado.usuario?.perfil === 'cliente' 
-        ? `<button class="btn btn-primary btn-full mt-2" onclick="finalizarPedido()">Finalizar Pedido</button>`
+        ? `<button class="btn btn-primary btn-full mt-2" onclick="finalizarPedido()">Fechar pedido pelo WhatsApp</button>`
         : `<button class="btn btn-secondary btn-full mt-2" onclick="navegarPara('login')">Entre para comprar</button>`}
     </div>
   `;
 }
 
+let pedidoEmAndamento = false;
+
 async function finalizarPedido() {
-  if (!estado.carrinho.length) return;
-  
+  if (!estado.carrinho.length || pedidoEmAndamento) return;
+
+  pedidoEmAndamento = true;
+  const carrinhoDoPedido = estado.carrinho.map(item => ({ ...item }));
+  const botao = document.querySelector('#cartSummary .cart-summary button');
+  if (botao) {
+    botao.disabled = true;
+    botao.textContent = 'Preparando seu pedido...';
+  }
+
+  // Abre a janela durante o clique para evitar bloqueadores de pop-up após a resposta da API.
+  let janelaWhatsApp = null;
   try {
-    const itens = estado.carrinho.map(i => ({ 
-      produto_id: i.produto_id, 
-      tamanho: i.tamanho, 
-      quantidade: i.quantidade 
+    janelaWhatsApp = window.open('about:blank', '_blank');
+    if (janelaWhatsApp) janelaWhatsApp.opener = null;
+  } catch (_) {
+    janelaWhatsApp = null;
+  }
+
+  try {
+    const itens = carrinhoDoPedido.map(item => ({
+      produto_id: item.produto_id,
+      tamanho: item.tamanho,
+      quantidade: item.quantidade
     }));
 
+    // Registra o pedido primeiro; os preços e o total válidos vêm da API/banco.
     const dados = await chamarApi('POST', '/pedidos', { itens });
-    
-    // Limpa o carrinho após a compra
+    const formatarMoeda = valor => Number(valor).toLocaleString('pt-BR', {
+      style: 'currency',
+      currency: 'BRL'
+    });
+    const listaItens = carrinhoDoPedido.map(item =>
+      `• ${item.nome} — tamanho ${item.tamanho} — quantidade: ${item.quantidade}`
+    ).join('\n');
+    const mensagem = [
+      'Olá! Quero fechar um pedido na Flor-de-lis.',
+      `Nome: ${estado.usuario?.nome || 'Cliente'}`,
+      `Pedido: #${dados.pedido_id}`,
+      '',
+      'Itens:',
+      listaItens,
+      '',
+      `Total (com frete): ${formatarMoeda(dados.total)}`,
+      'Gostaria de combinar o pagamento e a entrega com a atendente por aqui. Obrigada!'
+    ].join('\n');
+    const urlWhatsApp = `https://wa.me/5551997324522?text=${encodeURIComponent(mensagem)}`;
+
     estado.carrinho = [];
     salvarCarrinho();
     atualizarIconeCarrinho();
     renderizarCarrinho();
-    
-    mostrarMensagem(`Pedido #${dados.pedido_id} realizado com sucesso!`, 'success');
+    pedidoEmAndamento = false;
+    mostrarMensagem(`Pedido #${dados.pedido_id} registrado. Envie a mensagem no WhatsApp para falar com a atendente.`, 'success');
+
+    if (janelaWhatsApp && !janelaWhatsApp.closed) {
+      janelaWhatsApp.location.href = urlWhatsApp;
+    } else {
+      // Se o navegador bloqueou a nova aba, abre o WhatsApp nesta mesma janela.
+      window.location.href = urlWhatsApp;
+    }
   } catch (erro) {
+    if (janelaWhatsApp && !janelaWhatsApp.closed) janelaWhatsApp.close();
+    pedidoEmAndamento = false;
+    if (botao) {
+      botao.disabled = false;
+      botao.textContent = 'Fechar pedido pelo WhatsApp';
+    }
     mostrarMensagem(erro.message, 'error');
   }
 }
