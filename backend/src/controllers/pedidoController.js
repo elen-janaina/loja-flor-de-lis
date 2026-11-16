@@ -3,55 +3,83 @@ const sequelize = require('../config/database');
 
 // Função para o cliente criar um novo pedido (finalizar compra)
 async function criar(req, res) {
-  const t = await sequelize.transaction(); // Inicia uma transação para garantir que tudo dê certo ou nada seja salvo
+  const { itens, cidade_entrega: cidadeInformada } = req.body || {};
+  const usuarioId = req.usuario.id;
+
+  if (!Array.isArray(itens) || itens.length === 0) {
+    return res.status(400).json({ erro: 'O carrinho está vazio.' });
+  }
+  if (typeof cidadeInformada !== 'string' || !cidadeInformada.trim()) {
+    return res.status(400).json({ erro: 'Informe a cidade de entrega.' });
+  }
+
+  const cidade_entrega = cidadeInformada.trim().replace(/\s+/g, ' ');
+  if (cidade_entrega.length > 100) {
+    return res.status(400).json({ erro: 'A cidade deve ter no máximo 100 caracteres.' });
+  }
+
+  const cidadeNormalizada = cidade_entrega
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase();
+  const cidadeBase = cidadeNormalizada.split(',')[0]
+    .replace(/\s*-\s*(rs|rio grande do sul)$/i, '')
+    .trim();
+  const freteFixo = cidadeBase === 'santo antonio da patrulha' ? 10 : 0;
+  const frete_a_calcular = freteFixo === 0;
+  let t;
+
   try {
-    const { itens } = req.body;
-    const usuarioId = req.usuario.id;
+    t = await sequelize.transaction();
+    let subtotalCentavos = 0;
 
-    if (!itens || itens.length === 0) {
-      return res.status(400).json({ erro: 'O carrinho está vazio.' });
-    }
-
-    let valorTotal = 0;
-    const freteFixo = 10.00;
-
-    // Criamos o pedido primeiro
     const novoPedido = await Pedido.create({
       usuario_id: usuarioId,
-      total: 0, // Vamos atualizar depois de somar os itens
+      total: 0,
       frete: freteFixo,
+      cidade_entrega,
       status: 'pendente'
     }, { transaction: t });
 
-    // Agora processamos cada item do carrinho
     for (const item of itens) {
+      const quantidade = Number(item.quantidade);
+      if (!Number.isInteger(quantidade) || quantidade < 1) {
+        throw new Error('A quantidade dos itens do pedido é inválida.');
+      }
+
       const produto = await Produto.findByPk(item.produto_id, { transaction: t });
-      
       if (!produto || !produto.ativo) {
         throw new Error(`Produto ID ${item.produto_id} não encontrado ou indisponível.`);
       }
 
-      // Criamos o registro do item vinculado ao pedido
       await ItemPedido.create({
         pedido_id: novoPedido.id,
         produto_id: produto.id,
         tamanho: item.tamanho,
-        quantidade: item.quantidade,
+        quantidade,
         preco_unitario: produto.preco
       }, { transaction: t });
 
-      // Somamos ao valor total
-      valorTotal += (parseFloat(produto.preco) * item.quantidade);
+      subtotalCentavos += Math.round(Number(produto.preco) * 100) * quantidade;
     }
 
-    // Atualizamos o valor total final do pedido (itens + frete)
-    await novoPedido.update({ total: valorTotal + freteFixo }, { transaction: t });
+    const subtotal = subtotalCentavos / 100;
+    const total = (subtotalCentavos + Math.round(freteFixo * 100)) / 100;
+    await novoPedido.update({ total, frete: freteFixo }, { transaction: t });
 
-    await t.commit(); // Salva tudo no banco de dados
-    return res.status(201).json({ mensagem: 'Pedido realizado com sucesso!', pedido_id: novoPedido.id, total: novoPedido.total });
+    await t.commit();
+    return res.status(201).json({
+      mensagem: 'Pedido registrado com sucesso!',
+      pedido_id: novoPedido.id,
+      cidade_entrega,
+      subtotal: subtotal.toFixed(2),
+      frete: freteFixo.toFixed(2),
+      frete_a_calcular,
+      total: total.toFixed(2)
+    });
 
   } catch (erro) {
-    await t.rollback(); // Se der qualquer erro, cancela tudo que foi feito acima
+    if (t && !t.finished) await t.rollback();
     return res.status(500).json({ erro: 'Erro ao processar pedido: ' + erro.message });
   }
 }
