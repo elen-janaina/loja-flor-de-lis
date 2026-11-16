@@ -1,10 +1,5 @@
-// Configuração da URL da API (Backend)
-// No Docker usamos '/api' para o Nginx redirecionar
-// Em produção (GitHub Pages) aponta para o backend no Railway.
-// Em localhost (rodando via Docker/nginx) usa caminho relativo.
-const API_URL = (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1')
-  ? '/api'
-  : 'https://loja-flor-de-lis-production.up.railway.app/api';
+// O site e a API ficam no mesmo endereço, então o caminho é relativo.
+const API_URL = '/api';
 
 const estado = {
   usuario: JSON.parse(localStorage.getItem('user') || 'null'),
