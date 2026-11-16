@@ -36,7 +36,8 @@ services:
       DB_USER: loja_user
       DB_PASS: loja_pass
       DB_NAME: loja_roupas
-      JWT_SECRET: super_secret_jwt_key_2026
+      JWT_SECRET: chave_apenas_local_nao_usar_em_producao_0123456789
+      SEED_DEMO_USERS: "true"  # somente local
       JWT_EXPIRES_IN: 8h
       FRETE_FIXO: 10.00
     ports:
