@@ -29,15 +29,16 @@ services:
       db:
         condition: service_healthy
     environment:
-      NODE_ENV: production
+      NODE_ENV: development
       PORT: 3001
       DB_HOST: db
       DB_PORT: 5432
       DB_USER: loja_user
       DB_PASS: loja_pass
       DB_NAME: loja_roupas
-      JWT_SECRET: chave_apenas_local_nao_usar_em_producao_0123456789
-      SEED_DEMO_USERS: "true"  # somente local
+      JWT_SECRET: "${JWT_SECRET:?Defina JWT_SECRET no arquivo .env}"
+      ADMIN_EMAIL: ${ADMIN_EMAIL:-}
+      ADMIN_PASSWORD: ${ADMIN_PASSWORD:-}
       JWT_EXPIRES_IN: 8h
       FRETE_FIXO: 10.00
     ports:
