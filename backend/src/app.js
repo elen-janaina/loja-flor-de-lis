@@ -4,6 +4,8 @@ const cors = require('cors');
 const { sequelize } = require('./models');
 
 const app = express();
+// Atrás do proxy do Render: usa o IP real do visitante (necessário para o limite de tentativas)
+app.set('trust proxy', 1);
 app.use(cors());
 app.use(express.json());
 
