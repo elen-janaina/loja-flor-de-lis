@@ -11,6 +11,12 @@ const Usuario = sequelize.define('Usuario', {
     allowNull: false,
     defaultValue: 'cliente'
   }
-}, { tableName: 'usuarios', timestamps: true });
+}, {
+  tableName: 'usuarios',
+  timestamps: true,
+  defaultScope: {
+    attributes: { exclude: ['senha_hash'] }
+  }
+});
 
 module.exports = Usuario;
