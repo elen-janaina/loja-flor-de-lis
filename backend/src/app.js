@@ -4,7 +4,7 @@ const cors = require('cors');
 const { sequelize } = require('./models');
 
 const app = express();
-// Atrás do proxy do Render: usa o IP real do visitante (necessário para o limite de tentativas)
+// Atrás do proxy da hospedagem (Railway): usa o IP real do visitante (necessário para o limite de tentativas)
 app.set('trust proxy', 1);
 app.use(cors());
 app.use(express.json());
@@ -16,6 +16,10 @@ app.use('/api/pedidos', require('./routes/pedidos'));
 app.get('/api/health', (req, res) => {
   res.json({ status: 'servidor online' });
 });
+
+// Serve o site (frontend) pelo mesmo endereço da API
+const path = require('path');
+app.use(express.static(path.join(__dirname, '..', 'public')));
 
 app.use((req, res) => {
   res.status(404).json({ erro: 'Rota não encontrada.' });
