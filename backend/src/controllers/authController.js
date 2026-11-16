@@ -56,7 +56,8 @@ async function login(req, res) {
       return res.status(400).json({ erro: 'E-mail e senha são obrigatórios.' });
     }
 
-    const usuario = await Usuario.findOne({ where: { email: email.toLowerCase().trim() } });
+    // A consulta sem escopo é necessária apenas para comparar o hash no servidor.
+    const usuario = await Usuario.unscoped().findOne({ where: { email: email.toLowerCase().trim() } });
 
     // Mensagem idêntica para "não existe" e "senha errada" — evita vazar quais e-mails têm conta
     if (!usuario) {
